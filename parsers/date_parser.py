@@ -88,3 +88,14 @@ def parse_single_date(text: str | None) -> str | None:
     """"April 13, 2026" 같은 단일 날짜 텍스트를 ISO 날짜 문자열로 변환."""
     start, _ = parse_date_range(text)
     return start
+
+
+def month_of(dates_text: str | None) -> int | None:
+    """dates 텍스트(예: 'October 6-8, 2026')에서 월 번호(1~12)를 뽑아냄."""
+    matched = extract_conference_date(dates_text) if dates_text else None
+    if not matched:
+        return None
+    for name in MONTH_NAMES:
+        if matched.startswith(name):
+            return _MONTH_NUM[name]
+    return None

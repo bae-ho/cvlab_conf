@@ -1,6 +1,4 @@
 import os
-from datetime import datetime
-import pytz
 import requests
 
 # =========================
@@ -19,10 +17,6 @@ if not NOTION_TOKEN or not NOTION_DATABASE_ID:
         "Notion에서 integration 토큰을 재발급받아 환경변수로 넘겨주세요."
     )
 
-THIS_YEAR = datetime.now().year
-MIN_YEAR = int(os.environ.get("MIN_YEAR", THIS_YEAR))
-MAX_YEAR = int(os.environ.get("MAX_YEAR", THIS_YEAR))
-
 NOTION_API = "https://api.notion.com/v1"
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -33,6 +27,3 @@ HEADERS = {
 
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "Mozilla/5.0 (visionbib-notion-sync/3.0)"})
-
-# AoE(Anywhere on Earth) = UTC-12
-AOE_TZ = pytz.timezone("Etc/GMT+12")

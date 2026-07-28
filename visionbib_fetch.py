@@ -4,11 +4,8 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 from config import SESSION, VISIONBIB_URL
-from parsers.date_parser import DATE_RE, MONTHS as MONTH_ALT, extract_conference_date
+from parsers.date_parser import DATE_RE, MONTHS as MONTH_ALT
 from parsers.deadline_parser import extract_deadline_date_from_cells
-
-MONTHS = ["January","February","March","April","May","June",
-          "July","August","September","October","November","December"]
 
 # 사이트 구조: <a name="2026">2026</a> 앵커가 달린 table 뒤로 그 해의 컨퍼런스가
 # 하나씩 별도 <table>로 쭉 나열됨 (월별 table은 존재하지 않음 — 캘린더 그리드

@@ -1,10 +1,7 @@
 # parsers/deadline_parser.py
 import re
 
-MONTHS = (
-    "January|February|March|April|May|June|July|August|"
-    "September|October|November|December"
-)
+from parsers.date_parser import MONTHS
 
 # 예: "May 25, 2026", "May 25 2026", "May 25-31, 2026"
 DEADLINE_DATE_RE = re.compile(

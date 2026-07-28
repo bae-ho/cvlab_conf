@@ -2,77 +2,10 @@
 from collections import defaultdict
 from datetime import date
 
-from visionbib_fetch import MONTHS, iter_conference_rows
-from parsers.date_parser import extract_conference_date, parse_date_range, parse_single_date
-from notion_client import (
-    notion_get_title_property_name,
-    notion_query_by_uid,
-    notion_create_page,
-    notion_update_page,
-    notion_title,
-    notion_rich_text,
-    notion_date,
-)
-
-
-def make_uid(item):
-    return f"{item['acronym']}-{item['year']}"
-
-
-def build_notion_properties(item, title_prop):
-    start, end = parse_date_range(item.get("dates"))
-    deadline = parse_single_date(item.get("paper_deadline"))
-
-    return {
-        # "22nd International Conference..." 같은 정식명 대신 "CVPR2026" 형태로.
-        title_prop: notion_title(make_uid(item).replace("-", "")),
-        "Acronym": notion_rich_text(item.get("acronym")),
-        "장소": notion_rich_text(item.get("location")),
-        "UID": notion_rich_text(make_uid(item)),
-        "년도": {"number": int(item["year"])},
-        "날짜": notion_date(start, end),
-        "데드라인": notion_date(deadline),
-        "Source": {"url": item.get("source_url")},
-        "링크": {"url": item.get("cfp_url")},
-    }
-
-
-def push_to_notion(item, title_prop, dry_run=True):
-    uid = make_uid(item)
-    properties = build_notion_properties(item, title_prop)
-    existing = notion_query_by_uid(uid)
-
-    if existing and properties["데드라인"]["date"] is None:
-        prev_deadline = existing[0]["properties"].get("데드라인", {}).get("date")
-        if prev_deadline:
-            # 스크래핑으로 못 찾은 마감일(None)로, 이미 수동/이전에 채워둔 값을
-            # 지워버리지 않도록 보존. (예: 외부 CFP 사이트 PDF 보고 수동 입력한 값)
-            del properties["데드라인"]
-
-    if dry_run:
-        action = "update" if existing else "create"
-        print(f"[dry-run] would {action} UID={uid}: {properties}")
-        return
-
-    if existing:
-        notion_update_page(existing[0]["id"], properties)
-        print(f"[updated] {uid}")
-    else:
-        notion_create_page(properties)
-        print(f"[created] {uid}")
-
-
-def _month_of(dates_text):
-    """dates 텍스트(예: 'October 6-8, 2026')에서 월 번호(1~12)를 뽑아냄."""
-    if not dates_text:
-        return None
-    matched = extract_conference_date(dates_text)
-    if not matched:
-        return None
-    for i, name in enumerate(MONTHS, start=1):
-        if matched.startswith(name):
-            return i
-    return None
+from visionbib_fetch import iter_conference_rows
+from parsers.date_parser import parse_date_range, month_of
+from notion_client import notion_get_title_property_name
+from notion_sync import push_to_notion
 
 
 def run(year=None, years_ahead=1, months=None, limit_per_month=None, push=False, dry_run=True, only_upcoming=True):
@@ -92,7 +25,7 @@ def run(year=None, years_ahead=1, months=None, limit_per_month=None, push=False,
             start, _ = parse_date_range(item.get("dates"))
             if only_upcoming and start and start < today_iso:
                 continue
-            by_year_month[(y, _month_of(item.get("dates")))].append(item)
+            by_year_month[(y, month_of(item.get("dates")))].append(item)
 
     target_months = months if months is not None else range(1, 13)
     title_prop = notion_get_title_property_name() if push else None
