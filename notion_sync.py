@@ -33,17 +33,30 @@ def build_notion_properties(item, title_prop):
     }
 
 
+# 스크래핑 결과가 비어있어도(None) 이미 Notion에 채워져 있는 값은 지우지 않고
+# 보존할 프로퍼티들. {프로퍼티 이름: 값이 들어있는 내부 키}.
+# (예: SMC 데드라인을 CFP PDF 보고 수동 입력, MIPR 링크를 웹검색으로 수동 입력 —
+# 소스 사이트 쪽 데이터가 깨져있어(wrDate 오타, href="None.html") 자동으로는 못
+# 채우는 값들이 재동기화 때마다 빈 값으로 덮어써지지 않게 함.)
+_PRESERVE_IF_MISSING = {
+    "데드라인": "date",
+    "링크": "url",
+}
+
+
 def push_to_notion(item, title_prop, dry_run=True):
     uid = make_uid(item)
     properties = build_notion_properties(item, title_prop)
     existing = notion_query_by_uid(uid)
 
-    if existing and properties["데드라인"]["date"] is None:
-        prev_deadline = existing[0]["properties"].get("데드라인", {}).get("date")
-        if prev_deadline:
-            # 스크래핑으로 못 찾은 마감일(None)로, 이미 수동/이전에 채워둔 값을
-            # 지워버리지 않도록 보존. (예: 외부 CFP 사이트 PDF 보고 수동 입력한 값)
-            del properties["데드라인"]
+    if existing:
+        existing_props = existing[0]["properties"]
+        for prop_name, value_key in _PRESERVE_IF_MISSING.items():
+            if properties[prop_name].get(value_key) is not None:
+                continue
+            prev_value = existing_props.get(prop_name, {}).get(value_key)
+            if prev_value:
+                del properties[prop_name]
 
     if dry_run:
         action = "update" if existing else "create"
