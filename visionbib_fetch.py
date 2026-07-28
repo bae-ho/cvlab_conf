@@ -89,6 +89,14 @@ def _parse_conference_table(t):
     anchor_a = tds[0].find("a", attrs={"name": True})
     source_url = urljoin(VISIONBIB_URL, "#" + anchor_a["name"]) if anchor_a else VISIONBIB_URL
 
+    # 컨퍼런스 약어 옆 <a>가 name(내부 앵커)뿐 아니라 href로 그 컨퍼런스 자체 홈페이지도
+    # 갖고 있는 경우가 대부분. 가끔 "None.html" 같은 깨진 값이 있어 걸러낸다.
+    homepage_url = None
+    if anchor_a and anchor_a.get("href"):
+        href = anchor_a["href"].strip()
+        if href and "None" not in href:
+            homepage_url = urljoin(VISIONBIB_URL, href)
+
     dates = None
     paper_deadline = None
     cfp_url = None
@@ -115,6 +123,7 @@ def _parse_conference_table(t):
         "dates": dates,
         "paper_deadline": paper_deadline,
         "cfp_url": cfp_url,
+        "homepage_url": homepage_url,
         "source_url": source_url,
         "raw_blocks": [_cell_text(td) for td in tds],
     }

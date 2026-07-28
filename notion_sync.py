@@ -29,7 +29,7 @@ def build_notion_properties(item, title_prop):
         "날짜": notion_date(start, end),
         "데드라인": notion_date(deadline),
         "Source": {"url": item.get("source_url")},
-        "링크": {"url": item.get("cfp_url")},
+        "링크": {"url": item.get("homepage_url")},
     }
 
 
