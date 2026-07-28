@@ -47,6 +47,7 @@ def run(year=None, years_ahead=1, months=None, limit_per_month=None, push=False,
                 print("DATES:", item.get("dates"))
                 print("PAPER_DEADLINE:", item.get("paper_deadline"))
                 print("CFP_URL:", item.get("cfp_url"))
+                print("HOMEPAGE_URL:", item.get("homepage_url"))
 
                 if push:
                     push_to_notion(item, title_prop, dry_run=dry_run)
