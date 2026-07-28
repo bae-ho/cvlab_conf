@@ -8,8 +8,8 @@ import requests
 # =========================
 VISIONBIB_URL = "http://conferences.visionbib.com/Iris-Conferences.html"
 
-NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "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").strip()
-NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "2f0923c28a5d8079a7d6e0f8c304a138").strip()
+NOTION_TOKEN = os.environ.get("NOTION_TOKEN", "").strip()
+NOTION_DATABASE_ID = os.environ.get("NOTION_DATABASE_ID", "").strip()
 NOTION_VERSION = os.environ.get("NOTION_VERSION", "2022-06-28").strip()
 
 if not NOTION_TOKEN or not NOTION_DATABASE_ID:
