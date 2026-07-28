@@ -2,7 +2,7 @@ name: VisionBib -> Notion Sync
 
 on:
   schedule:
-    - cron: "0 0 * * *"  # 매일 00:00 UTC
+    - cron: "0 0 * * 1"  # 매주 월요일 00:00 UTC
   workflow_dispatch: {}   # Actions 탭에서 수동 실행 버튼도 사용 가능
 
 jobs:
