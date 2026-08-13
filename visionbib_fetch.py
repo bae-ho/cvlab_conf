@@ -139,7 +139,12 @@ def iter_conference_rows(year: int = 2026):
     tables = soup.find_all("table")
     rng = _find_year_table_range(tables, year)
     if rng is None:
-        raise RuntimeError(f"{year}년 섹션을 찾을 수 없음")
+        snippet = resp.text[:500].replace("\n", " ")
+        raise RuntimeError(
+            f"{year}년 섹션을 찾을 수 없음 "
+            f"(status={resp.status_code}, len={len(resp.text)}, tables={len(tables)}, "
+            f"body_start={snippet!r})"
+        )
     start, end = rng
 
     for t in tables[start:end]:
