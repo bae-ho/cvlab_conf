@@ -5,7 +5,7 @@ from datetime import date
 from visionbib_fetch import iter_conference_rows
 from parsers.date_parser import parse_date_range, month_of
 from notion_client import notion_get_title_property_name
-from notion_sync import push_to_notion
+from notion_sync import push_to_notion, archive_past_conferences
 
 
 def run(year=None, years_ahead=1, months=None, limit_per_month=None, push=False, dry_run=True, only_upcoming=True):
@@ -59,6 +59,10 @@ def run(year=None, years_ahead=1, months=None, limit_per_month=None, push=False,
                     break
 
             print(f"[month done] {y}-{m:02d} => {count} items")
+
+    # 이미 끝난 컨퍼런스 페이지는 Notion에서 삭제(휴지통 이동).
+    if push and only_upcoming:
+        archive_past_conferences(today_iso, dry_run=dry_run)
 
     print(f"\n[all done] total items: {total}")
 

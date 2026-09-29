@@ -83,3 +83,23 @@ def notion_update_block(block_id: str, payload: dict):
 def notion_delete_block(block_id: str):
     r = SESSION.delete(f"{NOTION_API}/blocks/{block_id}", headers=HEADERS, timeout=30)
     _req_ok(r, "Notion delete block failed")
+
+def notion_query_all(filter_: dict) -> list:
+    results, cursor = [], None
+    while True:
+        payload = {"filter": filter_, "page_size": 100}
+        if cursor:
+            payload["start_cursor"] = cursor
+        r = SESSION.post(f"{NOTION_API}/databases/{NOTION_DATABASE_ID}/query", headers=HEADERS, json=payload, timeout=30)
+        _req_ok(r, "Notion query failed")
+        data = r.json()
+        results.extend(data.get("results", []))
+        if not data.get("has_more"):
+            return results
+        cursor = data.get("next_cursor")
+
+def notion_archive_page(page_id: str):
+    # Notion API의 "삭제"는 archive(휴지통 이동) — 30일 안에는 휴지통에서 복구 가능.
+    r = SESSION.patch(f"{NOTION_API}/pages/{page_id}", headers=HEADERS, json={"archived": True}, timeout=30)
+    _req_ok(r, "Notion archive failed")
+    return r.json()

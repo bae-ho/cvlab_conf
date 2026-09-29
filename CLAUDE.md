@@ -117,7 +117,10 @@ visionbib_fetch.py  --iter_conference_rows(year)-->  dict per conference
   push, dry_run, only_upcoming)` fetches `iter_conference_rows` for `year` through `year + years_ahead`
   (default: this year + next year — VisionBib has very little data beyond that), buckets by
   `(year, month)`, filters out anything before today when `only_upcoming` (default `True`), prints each
-  item, and calls `notion_sync.push_to_notion()` per item when `push=True`. CLI (`__main__`): `--live`
+  item, and calls `notion_sync.push_to_notion()` per item when `push=True`. After that (when `push` and
+  `only_upcoming`), `notion_sync.archive_past_conferences()` archives (moves to Notion trash, recoverable
+  for 30 days) every page with a non-empty `UID` whose 날짜 end date (or start date if no range) is before
+  today; pages without a `UID` (added by hand) are never touched. CLI (`__main__`): `--live`
   actually writes to Notion, `--no-push` skips Notion entirely (console only); default is push=True with
   dry_run=True (preview only, no writes).
 

@@ -8,6 +8,8 @@ from notion_client import (
     notion_title,
     notion_rich_text,
     notion_date,
+    notion_query_all,
+    notion_archive_page,
 )
 from notion_detail import sync_detail_section
 
@@ -75,3 +77,25 @@ def push_to_notion(item, title_prop, dry_run=True):
 
     # 페이지 본문에 상세 정보(기본 정보/마감/링크/워크샵·챌린지 표) 섹션을 쓴다.
     sync_detail_section(page_id, item, dry_run=False)
+
+
+def archive_past_conferences(today_iso, dry_run=True):
+    """날짜(끝나는 날, 범위가 아니면 시작일)가 오늘 이전인 컨퍼런스 페이지를 휴지통으로 보낸다.
+    UID가 있는(= 이 스크립트가 만든) 페이지만 대상 — 사람이 직접 추가한 행은 건드리지 않음."""
+    pages = notion_query_all({"and": [
+        {"property": "날짜", "date": {"before": today_iso}},
+        {"property": "UID", "rich_text": {"is_not_empty": True}},
+    ]})
+    for page in pages:
+        props = page["properties"]
+        date = props["날짜"].get("date") or {}
+        last_day = date.get("end") or date.get("start")
+        # 날짜 필터 "before"는 시작일 기준이라, 진행 중인(시작은 지났지만 안 끝난) 컨퍼런스는 여기서 거른다.
+        if not last_day or last_day[:10] >= today_iso:
+            continue
+        uid = "".join(rt.get("plain_text", "") for rt in props["UID"].get("rich_text", []))
+        if dry_run:
+            print(f"[dry-run] would archive {uid} (ended {last_day[:10]})")
+            continue
+        notion_archive_page(page["id"])
+        print(f"[archived] {uid} (ended {last_day[:10]})")
