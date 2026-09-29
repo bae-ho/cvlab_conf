@@ -54,6 +54,94 @@ def _fallback_deadline_from_cfp(cfp_url):
     return date_m.group(0) if date_m else None
 
 
+# "Paper deadline: wrDate('May 4, 2026'); Extension ..." -> 라벨("Paper"), 날짜, 비고.
+# 사이트에 "wrate(" 같은 오타도 있어서 wr\w*Date가 아니라 wr\w*로 느슨하게 매칭.
+_DEADLINE_CELL_RE = re.compile(
+    r"^(?P<label>.*?)\bdeadline\s*:\s*(?:wr\w*\(\s*'(?P<date>[^']*)'\s*\)\s*;?)?(?P<note>.*)$",
+    re.I | re.S,
+)
+_CALL_FOR_RE = re.compile(r"^\s*Call for\b", re.I)
+# 하위 이벤트의 날짜 셀. "September 8 or 9, 2026"처럼 DATE_RE에 안 맞는 표기도 있어 느슨하게.
+_EVENT_DATE_CELL_RE = re.compile(rf"^(?:{MONTH_ALT})\s+\d{{1,2}}\b.*\b\d{{4}}$", re.S)
+# 이 라벨만으로는 무슨 일정인지 알 수 없어서 CFP 링크 텍스트("Call for Workshops")를 제목으로 쓴다.
+_GENERIC_DEADLINE_LABELS = {"paper", "proposal", "submission", "results"}
+
+
+def _clean_note(text):
+    # 셀 텍스트에 섞여 들어오는 링크 텍스트 뒤의 " ." 와 여분 공백 정리.
+    text = re.sub(r"\s+\.(?=\s|$)", "", text)
+    return re.sub(r"\s+", " ", text).strip(" .;") or None
+
+
+def _cell_links(td):
+    links = []
+    for a in td.find_all("a", href=True):
+        href = a["href"].strip()
+        if not href or "None" in href or "Nocall" in href:
+            continue
+        links.append((" ".join(a.stripped_strings), urljoin(VISIONBIB_URL, href)))
+    return links
+
+
+def _parse_deadline_cell(td):
+    """마감일 셀 -> {"label", "raw_date", "note"}. deadline 셀이 아니면 None."""
+    text = _cell_text(td)
+    m = _DEADLINE_CELL_RE.match(text)
+    if not m:
+        return None
+    note = m.group("note")
+    for link_text, _ in _cell_links(td):
+        note = note.replace(link_text, "")
+    raw_date = m.group("date") or extract_deadline_date_from_cells([text])
+    return {
+        "label": m.group("label").strip() or None,
+        "raw_date": raw_date,
+        "note": _clean_note(note),
+    }
+
+
+def _parse_sub_events(tds):
+    """메인 (dates, deadline, cfp) 뒤에 이어지는 워크샵/챌린지/추가 마감 셀들을
+    이벤트 단위로 묶는다. 셀 순서가 이벤트마다 (날짜, 마감, CFP) / (날짜, 제목, 마감)
+    등으로 제각각이라 위치 대신 "날짜 셀이 나오면 새 이벤트 시작"으로 그룹핑하고,
+    그룹 안에서는 셀 내용으로 역할을 판별한다."""
+    events = []
+    cur = None
+    for td in tds:
+        text = _cell_text(td)
+        if not text or text == ".":
+            continue
+        if _EVENT_DATE_CELL_RE.match(text) and not td.find("a", href=True):
+            cur = {"dates": text, "title": None, "url": None, "deadline_label": None,
+                   "deadline": None, "deadline_note": None, "cfp_url": None, "cfp_label": None}
+            events.append(cur)
+            continue
+        if cur is None:
+            continue
+
+        dl = _parse_deadline_cell(td)
+        if dl:
+            cur["deadline_label"] = dl["label"]
+            cur["deadline"] = dl["raw_date"]
+            cur["deadline_note"] = dl["note"]
+        for link_text, url in _cell_links(td):
+            if _CALL_FOR_RE.match(link_text):
+                cur["cfp_url"], cur["cfp_label"] = url, link_text
+            elif cur["title"] is None:
+                cur["title"], cur["url"] = link_text, url
+        if not dl and not td.find("a", href=True) and cur["title"] is None:
+            cur["title"] = _clean_note(text)
+
+    for ev in events:
+        if ev["title"] is None:
+            # 제목 셀이 없는 추가 마감(예: ICMI "Demos deadline")은 라벨/CFP 텍스트로 대체.
+            label = ev["deadline_label"]
+            if label and label.lower() in _GENERIC_DEADLINE_LABELS and ev["cfp_label"]:
+                label = ev["cfp_label"]
+            ev["title"] = label or ev["cfp_label"] or "추가 일정"
+    return [ev for ev in events if ev["deadline"] or ev["title"] != "추가 일정"]
+
+
 def _find_year_table_range(tables, year: int):
     """연도 앵커 table의 인덱스를 찾아, 그 다음 연도 앵커 table 전까지의
     (start, end) 범위를 반환. 못 찾으면 None."""
@@ -99,13 +187,17 @@ def _parse_conference_table(t):
 
     dates = None
     paper_deadline = None
+    deadline_note = None
     cfp_url = None
+    sub_events = []
 
     if len(tds) >= 7:
         dates = _cell_text(tds[4]) or None
 
         deadline_text = _cell_text(tds[5])
         paper_deadline = extract_deadline_date_from_cells([deadline_text])
+        dl = _parse_deadline_cell(tds[5])
+        deadline_note = dl["note"] if dl else None
 
         cfp_a = tds[6].find("a", href=True)
         # CFP 링크가 "2026/icmi-10-26-call.html" 같은 상대경로라 절대 URL로 변환.
@@ -113,6 +205,8 @@ def _parse_conference_table(t):
 
         if paper_deadline is None:
             paper_deadline = _fallback_deadline_from_cfp(cfp_url)
+
+        sub_events = _parse_sub_events(tds[7:])
 
     return {
         "acronym": acronym,
@@ -122,6 +216,8 @@ def _parse_conference_table(t):
         "venue": venue or None,
         "dates": dates,
         "paper_deadline": paper_deadline,
+        "deadline_note": deadline_note,
+        "sub_events": sub_events,
         "cfp_url": cfp_url,
         "homepage_url": homepage_url,
         "source_url": source_url,

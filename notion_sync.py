@@ -9,6 +9,7 @@ from notion_client import (
     notion_rich_text,
     notion_date,
 )
+from notion_detail import sync_detail_section
 
 
 def make_uid(item):
@@ -61,11 +62,16 @@ def push_to_notion(item, title_prop, dry_run=True):
     if dry_run:
         action = "update" if existing else "create"
         print(f"[dry-run] would {action} UID={uid}: {properties}")
+        sync_detail_section(None, item, dry_run=True)
         return
 
     if existing:
-        notion_update_page(existing[0]["id"], properties)
+        page_id = existing[0]["id"]
+        notion_update_page(page_id, properties)
         print(f"[updated] {uid}")
     else:
-        notion_create_page(properties)
+        page_id = notion_create_page(properties)["id"]
         print(f"[created] {uid}")
+
+    # 페이지 본문에 상세 정보(기본 정보/마감/링크/워크샵·챌린지 표) 섹션을 쓴다.
+    sync_detail_section(page_id, item, dry_run=False)

@@ -78,8 +78,9 @@ visionbib_fetch.py  --iter_conference_rows(year)-->  dict per conference
   the literal string `"Conference Venue"`, sometimes an actual venue name — never a link). `td[4:7]` =
   (dates, paper-deadline text, CFP-link cell) for the *main* conference entry. Conferences with attached
   workshops/extra deadlines repeat more `(dates, deadline, cfp)` triples after `td[6]` — these are
-  intentionally **ignored** (only the first triple is parsed) to keep one row = one conference, matching
-  the `UID` design; the full cell text is still kept per-item in `raw_blocks`. `iter_conference_rows(year)`
+  not turned into separate rows (one row = one conference, matching the `UID` design); instead
+  `_parse_sub_events()` groups them (a new event starts at each date cell) into `item["sub_events"]`,
+  which only feeds the page-body detail section; the full cell text is still kept per-item in `raw_blocks`. `iter_conference_rows(year)`
   fetches and parses one whole year per call; there is no `month` parameter — `sync.py` filters by month.
   When the main listing has no deadline, `_fallback_deadline_from_cfp()` tries fetching the CFP link and
   scraping a `"Paper submission: <date>"` line — but **only** when the link is same-domain
@@ -105,6 +106,13 @@ visionbib_fetch.py  --iter_conference_rows(year)-->  dict per conference
   `push_to_notion()` deliberately skips overwriting that field — this exists because some deadlines get
   filled in manually (e.g. found in a PDF on an external conference site) and a routine re-sync should
   never silently blank those back out.
+- **`notion_detail.py`**: writes a "상세 정보" section into each page **body** (basic info, main deadline
+  + note, links, and a table of workshops/challenges/extra deadlines from `item["sub_events"]`, which
+  `visionbib_fetch._parse_sub_events()` builds from the cells after `td[6]`). The script only owns one
+  callout block whose text starts with `VisionBib 자동 동기화 정보`; it replaces that callout's children
+  and never touches anything else in the body, so manual notes outside the callout survive. The callout
+  text carries a content hash `[xxxxxxxxxx]` — if the hash hasn't changed, no block API calls are made.
+  Called from `push_to_notion()` after the create/update.
 - **`sync.py`**: thin entry point/orchestrator only — `run(year, years_ahead, months, limit_per_month,
   push, dry_run, only_upcoming)` fetches `iter_conference_rows` for `year` through `year + years_ahead`
   (default: this year + next year — VisionBib has very little data beyond that), buckets by
